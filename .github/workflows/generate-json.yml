@@ -1,0 +1,51 @@
+name: Generate PDF Index JSON
+
+on:
+  push:
+    paths:
+      - 'pdfs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate JSON list
+        run: |
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          echo "[" > index.json
+          first=true
+          
+          for file in pdfs/*.pdf; do
+            if [ -f "$file" ]; then
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo "," >> index.json
+              fi
+              filename=$(basename "$file")
+              # Construct the public GitHub Pages URL
+              url="https://${REPO_OWNER}.github.io/${REPO_NAME}/pdfs/${filename}"
+          
+              echo "  {" >> index.json
+              echo "    \"name\": \"${filename}\"," >> index.json
+              echo "    \"url\": \"${url}\"" >> index.json
+              echo "  }" >> index.json
+            fi
+          done
+          echo "]" >> index.json
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "github-actions[bot]@://github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update PDF index JSON" && git push)
